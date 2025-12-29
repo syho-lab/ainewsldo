@@ -1,5 +1,6 @@
 import logging
 import os
+import sqlite3
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 import httpx
@@ -17,6 +18,31 @@ if not OPENROUTER_API_KEY or not TELEGRAM_TOKEN:
 
 # Начальная личность бота
 bot_personality = "Добрый"
+
+# Инициализация базы данных для хранения сообщений
+def init_db():
+    conn = sqlite3.connect('memory.db')
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY, text TEXT)''')
+    conn.commit()
+    conn.close()
+
+# Сохранение сообщений в базе данных
+def save_message(message_text):
+    conn = sqlite3.connect('memory.db')
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO messages (text) VALUES (?)", (message_text,))
+    conn.commit()
+    conn.close()
+
+# Получение последнего сообщения
+def get_last_message():
+    conn = sqlite3.connect('memory.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT text FROM messages ORDER BY id DESC LIMIT 1")
+    last_message = cursor.fetchone()
+    conn.close()
+    return last_message[0] if last_message else None
 
 # Функция для асинхронного запроса к OpenRouter API с изменением личности
 async def get_openrouter_response(user_message, personality):
@@ -48,7 +74,19 @@ async def get_openrouter_response(user_message, personality):
 
 # Функция обработки сообщений от пользователя
 async def handle_message(update: Update, context):
-    # Отправляем сообщение "Думаю..."
+    # Получаем последнее сообщение из базы данных
+    last_message = get_last_message()
+    
+    # Если есть последнее сообщение, отвечаем на него
+    if last_message:
+        await update.message.reply_text(f"Последнее сообщение: {last_message}")
+    else:
+        await update.message.reply_text("Нет сохраненных сообщений.")
+    
+    # Сохраняем текущее сообщение в базе данных
+    save_message(update.message.text)
+
+    # Отправляем запрос к OpenRouter
     thinking_message = await update.message.reply_text("Думаю...")
 
     user_message = update.message.text
@@ -96,6 +134,9 @@ async def button(update: Update, context):
 
 # Основная функция для запуска бота
 def main():
+    # Инициализация базы данных
+    init_db()
+
     # Включаем логирование
     logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                         level=logging.INFO)
