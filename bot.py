@@ -4,6 +4,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 import httpx
 import json
+import os
+PORT = int(os.getenv('PORT', 8080))
 
 # Загружаем ключи из переменных окружения
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")  # Получаем OpenRouter API ключ
